@@ -2,8 +2,9 @@ name: Fetch Gmail Orders
 
 on:
   schedule:
-    - cron: '0 * * * *'       # every hour at minute 0
-  workflow_dispatch:          # plus manual trigger
+    - cron: '30 6-17 * * *'   # Every hour at minute 30 from 6:30 to 17:30 UTC (9:30 to 20:30 Egypt time)
+  workflow_dispatch:          # Manual trigger
+
 
 env:
   GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
