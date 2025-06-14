@@ -14,13 +14,12 @@ def search_recent_emails(service):
         '-from:me '
         '-from:osama@khodar.com '
         '(subject:"TMart Purchase Orders" OR subject:"Rabbit PO - Khodar trading and marketing" '
-        'OR subject:"Khodar PO - Delivery Date" '
+        'OR subject:"Khodar PO - Delivery Date" OR subject:"Khodar.com PO - Goodsmart" '
         'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com '
-        'OR from:abdelhamid.oraby@breadfast.com)'
+        'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
     )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
-
 
 def extract_order_date_from_subject(subject):
     match = re.search(r"\[(\d{4}-\d{2}-\d{2})\]", subject)
@@ -30,7 +29,6 @@ def extract_order_date_from_subject(subject):
 
 def get_next_delivery_date():
     tomorrow = datetime.today() + timedelta(days=1)
-    # If tomorrow is Friday (weekday == 4), use Saturday
     if tomorrow.weekday() == 4:
         return (tomorrow + timedelta(days=1)).strftime("%Y-%m-%d")
     return tomorrow.strftime("%Y-%m-%d")
@@ -56,6 +54,7 @@ def fetch_and_upload_orders():
         headers = msg_data.get("payload", {}).get("headers", [])
         subject = next((h["value"] for h in headers if h["name"] == "Subject"), "")
         sender = next((h["value"] for h in headers if h["name"] == "From"), "")
+        snippet = msg_data.get("snippet", "")
 
         parts = msg_data["payload"].get("parts", [])
         zip_buffer = io.BytesIO()
@@ -64,32 +63,28 @@ def fetch_and_upload_orders():
         status = "Pending"
         client = "Unknown"
         city = None
+        po_number = None
 
-        # --- BreadFast custom handling ---
+        # --- BreadFast ---
         if subject.lower().startswith("khodar po - delivery date") or "abdelhamid.oraby@breadfast.com" in sender.lower():
             client = "Breadfast"
-            status = "Pending"
             order_date = datetime.today().strftime("%Y-%m-%d")
 
-            # Extract delivery date
             date_match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", subject)
             if date_match:
                 delivery_date = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
             else:
                 delivery_date = get_next_delivery_date()
 
-            # Determine city
             subject_lower = subject.lower()
             if "alex" in subject_lower:
                 city = "Alexandria"
             elif "mansoura" in subject_lower:
                 city = "Mansoura"
             else:
-                # fallback to (City) pattern if needed
                 city_match = re.search(r"\((.*?)\)", subject)
                 if city_match:
                     city = city_match.group(1).strip().capitalize()
-
 
             for part in parts:
                 filename = part.get("filename")
@@ -115,9 +110,51 @@ def fetch_and_upload_orders():
                         print(f"  Uploaded BreadFast PDF. Supabase ID: {upload_response[0].get('id')}")
                     except Exception as e:
                         print(f"  BreadFast Upload failed: {e}")
-            continue  # skip rest of flow
+            continue
 
-        # --- General flow (Rabbit/Khateer or Talabat) ---
+        # --- GoodsMart ---
+        if "amir.maher@goodsmartegypt.com" in sender.lower() or "khodar.com po - goodsmart" in subject.lower():
+            client = "GoodsMart"
+            order_date = datetime.today().strftime("%Y-%m-%d")
+            status = "Pending"
+
+            # Extract delivery date
+            delivery_match = re.search(r"Expected Delivery Date:\s*(\d{1,2}/\d{1,2}/\d{4})", snippet)
+            if delivery_match:
+                delivery_date = datetime.strptime(delivery_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
+
+            # Extract PO Number
+            po_match = re.search(r"PO No\s*(\d+)", snippet)
+            if po_match:
+                po_number = po_match.group(1)
+
+            for part in parts:
+                filename = part.get("filename")
+                body = part.get("body", {})
+                if filename and "attachmentId" in body and filename.lower().endswith(".xlsx"):
+                    att_id = body["attachmentId"]
+                    attachment = service.users().messages().attachments().get(
+                        userId='me', messageId=msg['id'], id=att_id).execute()
+                    file_data = base64.urlsafe_b64decode(attachment['data'].encode("UTF-8"))
+
+                    try:
+                        upload_response = upload_order_and_metadata(
+                            file_bytes=file_data,
+                            filename=filename,
+                            client=client,
+                            order_type="Purchase Order",
+                            order_date=order_date,
+                            delivery_date=delivery_date,
+                            status=status,
+                            city=None,
+                            po_number=po_number
+                        )
+                        print(f"  Uploaded GoodsMart file. Supabase ID: {upload_response[0].get('id')}")
+                    except Exception as e:
+                        print(f"  GoodsMart upload failed: {e}")
+            continue
+
+        # --- General (Rabbit / Khateer / Talabat) ---
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
             for part in parts:
                 filename = part.get("filename")
@@ -137,7 +174,6 @@ def fetch_and_upload_orders():
         zip_buffer.seek(0)
         zip_filename = f"email_order_{idx}.zip"
 
-        # Talabat override
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
             if not match:
@@ -164,7 +200,7 @@ def fetch_and_upload_orders():
                 delivery_date=delivery_date,
                 status=status,
                 city=city,
-                po_number=None
+                po_number=po_number
             )
             print(f"  Uploaded successfully. Supabase ID: {upload_response[0].get('id')}")
         except Exception as e:
