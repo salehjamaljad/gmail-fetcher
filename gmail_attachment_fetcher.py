@@ -4,14 +4,17 @@ import zipfile
 import io
 from datetime import datetime, timedelta
 from config import authenticate_gmail, upload_order_and_metadata
+import openpyxl
 
-
-def search_recent_tmart_emails(service):
+def search_recent_emails(service):
     after_ts = int((datetime.utcnow() - timedelta(hours=1)).timestamp())
-    query = f'after:{after_ts} (subject:"TMart Purchase Orders" OR from:sherif.hossam@talabat.com)'
+    query = (
+        f'after:{after_ts} '
+        '(subject:"TMart Purchase Orders" OR subject:"Rabbit PO - Khodar trading and marketing" '
+        'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com)'
+    )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
-
 
 def extract_order_date_from_subject(subject):
     match = re.search(r"\[(\d{4}-\d{2}-\d{2})\]", subject)
@@ -19,10 +22,27 @@ def extract_order_date_from_subject(subject):
         return datetime.strptime(match.group(1), "%Y-%m-%d").date()
     return None
 
+def get_next_delivery_date():
+    tomorrow = datetime.today() + timedelta(days=1)
+    # If tomorrow is Friday (weekday == 4), use Saturday
+    if tomorrow.weekday() == 4:
+        return (tomorrow + timedelta(days=1)).strftime("%Y-%m-%d")
+    return tomorrow.strftime("%Y-%m-%d")
 
-def fetch_and_upload_tmart_orders():
+def determine_khateer_or_rabbit(xlsx_bytes):
+    try:
+        in_memory_file = io.BytesIO(xlsx_bytes)
+        wb = openpyxl.load_workbook(in_memory_file, data_only=True)
+        ws = wb.active
+        value = str(ws["D10"].value).lower() if ws["D10"].value else ""
+        return "Khateer" if "khateer" in value else "Rabbit"
+    except Exception as e:
+        print("Failed to inspect D10 for client check:", e)
+        return "Rabbit"
+
+def fetch_and_upload_orders():
     service = authenticate_gmail()
-    messages = search_recent_tmart_emails(service)
+    messages = search_recent_emails(service)
     print(f"Found {len(messages)} matching emails")
 
     for idx, msg in enumerate(messages, 1):
@@ -31,27 +51,12 @@ def fetch_and_upload_tmart_orders():
         subject = next((h["value"] for h in headers if h["name"] == "Subject"), "")
         sender = next((h["value"] for h in headers if h["name"] == "From"), "")
 
-        if not subject.lower().startswith("tmart purchase orders") and "sherif.hossam@talabat.com" not in sender.lower():
-            continue
-
-        order_date_obj = extract_order_date_from_subject(subject)
-        if not order_date_obj:
-            print(f"Skipping email {idx}: no valid date found in subject")
-            continue
-
-        order_date = order_date_obj.strftime("%Y-%m-%d")
-        delivery_date = (order_date_obj + timedelta(days=2)).strftime("%Y-%m-%d")
-        client = "Talabat"
-        status = "Pending"
-
-        print(f"\nProcessing email {idx}")
-        print(f"  Subject: {subject}")
-        print(f"  From: {sender}")
-        print(f"  Order Date: {order_date}")
-        print(f"  Delivery Date: {delivery_date}")
-
         parts = msg_data["payload"].get("parts", [])
         zip_buffer = io.BytesIO()
+        order_date = datetime.today().strftime("%Y-%m-%d")
+        delivery_date = get_next_delivery_date()
+        status = "Pending"
+        client = "Unknown"
 
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
             for part in parts:
@@ -62,15 +67,32 @@ def fetch_and_upload_tmart_orders():
                         continue
                     att_id = body["attachmentId"]
                     attachment = service.users().messages().attachments().get(
-                        userId='me',
-                        messageId=msg['id'],
-                        id=att_id
-                    ).execute()
+                        userId='me', messageId=msg['id'], id=att_id).execute()
                     file_data = base64.urlsafe_b64decode(attachment['data'].encode("UTF-8"))
                     zipf.writestr(filename, file_data)
 
+                    # Determine client from first xlsx
+                    if filename.lower().endswith(".xlsx") and client == "Unknown":
+                        client = determine_khateer_or_rabbit(file_data)
+
         zip_buffer.seek(0)
-        zip_filename = f"tmart_email_{idx}.zip"
+        zip_filename = f"email_order_{idx}.zip"
+
+        if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
+            match = extract_order_date_from_subject(subject)
+            if not match:
+                print(f"Skipping email {idx}: no valid date in subject")
+                continue
+            order_date = match.strftime("%Y-%m-%d")
+            delivery_date = (match + timedelta(days=2)).strftime("%Y-%m-%d")
+            client = "Talabat"
+
+        print(f"\nProcessing email {idx}")
+        print(f"  Subject: {subject}")
+        print(f"  From: {sender}")
+        print(f"  Order Date: {order_date}")
+        print(f"  Delivery Date: {delivery_date}")
+        print(f"  Client: {client}")
 
         try:
             upload_response = upload_order_and_metadata(
@@ -88,6 +110,5 @@ def fetch_and_upload_tmart_orders():
         except Exception as e:
             print(f"  Upload failed: {e}")
 
-
 if __name__ == '__main__':
-    fetch_and_upload_tmart_orders()
+    fetch_and_upload_orders()
