@@ -1,0 +1,41 @@
+name: Fetch TMart Orders
+
+# Run hourly + allow manual dispatch
+on:
+  schedule:
+    - cron:  '0 * * * *'        # at minute 0 past every hour
+  workflow_dispatch:           # manual trigger button
+
+jobs:
+  fetch-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'     # or your preferred version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir google-auth google-auth-oauthlib google-api-python-client requests
+
+      - name: Restore Gmail credentials
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > credentials.json
+          echo "${{ secrets.GMAIL_TOKEN_JSON }}"      > token.json
+
+      - name: Export environment variables
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}"            >> $GITHUB_ENV
+          echo "SUPABASE_API_KEY=${{ secrets.SUPABASE_API_KEY }}"    >> $GITHUB_ENV
+          echo "SUPABASE_STORAGE_BUCKET=${{ secrets.SUPABASE_STORAGE_BUCKET }}" >> $GITHUB_ENV
+          echo "SUPABASE_TABLE_NAME=${{ secrets.SUPABASE_TABLE_NAME }}"       >> $GITHUB_ENV
+
+      - name: Fetch & upload TMart orders
+        run: |
+          python gmail_attachment_fetcher.py
