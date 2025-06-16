@@ -172,7 +172,7 @@ def fetch_and_upload_orders():
                         client = determine_khateer_or_rabbit(file_data)
 
         zip_buffer.seek(0)
-        zip_filename = f"{filename}_{idx}.zip"
+        zip_filename = f"{filename}.zip"
 
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
