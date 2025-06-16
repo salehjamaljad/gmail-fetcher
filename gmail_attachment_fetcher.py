@@ -177,7 +177,7 @@ def fetch_and_upload_orders():
                         client = determine_khateer_or_rabbit(file_data)
 
         zip_buffer.seek(0)
-        zip_filename = f"{filename}.zip"
+        zip_filename = f"{filename}_{client}.zip"
         zip_filename = safe_zip_filename(filename)
 
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
