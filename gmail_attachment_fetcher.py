@@ -7,7 +7,7 @@ from config import authenticate_gmail, upload_order_and_metadata
 import openpyxl
 
 def search_recent_emails(service):
-    after_ts = int((datetime.utcnow() - timedelta(hours=1)).timestamp())
+    after_ts = int((datetime.utcnow() - timedelta(hours=3)).timestamp())
     query = (
         f'after:{after_ts} '
         'label:inbox has:attachment '
@@ -43,6 +43,11 @@ def determine_khateer_or_rabbit(xlsx_bytes):
     except Exception as e:
         print("Failed to inspect D10 for client check:", e)
         return "Rabbit"
+
+
+def safe_zip_filename(filename: str) -> str:
+    encoded = base64.urlsafe_b64encode(filename.encode()).decode()
+    return f"{encoded}.zip"
 
 def fetch_and_upload_orders():
     service = authenticate_gmail()
@@ -173,6 +178,7 @@ def fetch_and_upload_orders():
 
         zip_buffer.seek(0)
         zip_filename = f"{filename}.zip"
+        zip_filename = safe_zip_filename(filename)
 
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
