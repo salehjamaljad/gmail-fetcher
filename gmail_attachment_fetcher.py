@@ -7,7 +7,7 @@ from config import authenticate_gmail, upload_order_and_metadata
 import openpyxl
 
 def search_recent_emails(service):
-    after_ts = int((datetime.utcnow() - timedelta(hours=3)).timestamp())
+    after_ts = int((datetime.utcnow() - timedelta(hours=2)).timestamp())
     query = (
         f'after:{after_ts} '
         'label:inbox has:attachment '
@@ -177,8 +177,9 @@ def fetch_and_upload_orders():
                         client = determine_khateer_or_rabbit(file_data)
 
         zip_buffer.seek(0)
-        zip_filename = f"{filename}_{client}.zip"
+        zip_filename = f"{filename}.zip"
         zip_filename = safe_zip_filename(filename)
+        zip_filename = client + zip_filename
 
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
