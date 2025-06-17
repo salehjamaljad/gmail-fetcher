@@ -7,7 +7,7 @@ from config import authenticate_gmail, upload_order_and_metadata
 import openpyxl
 
 def search_recent_emails(service):
-    after_ts = int((datetime.utcnow() - timedelta(hours=2)).timestamp())
+    after_ts = int((datetime.utcnow() - timedelta(hours=1.1)).timestamp())
     query = (
         f'after:{after_ts} '
         'label:inbox has:attachment '
