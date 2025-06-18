@@ -17,6 +17,7 @@ def search_recent_emails(service):
         'OR subject:"Khodar PO - Delivery Date" OR subject:"Khodar.com PO - Goodsmart" '
         'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com '
         'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
+        'OR from:Mohamed.OthmanAli@halan.com'
     )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
@@ -48,6 +49,10 @@ def determine_khateer_or_rabbit(xlsx_bytes):
 def safe_zip_filename(filename: str) -> str:
     encoded = base64.urlsafe_b64encode(filename.encode()).decode()
     return f"{encoded}.zip"
+
+def safe_xlsx_filename(filename: str) -> str:
+    encoded = base64.urlsafe_b64encode(filename.encode()).decode()
+    return f"{encoded}.xlsx"
 
 def fetch_and_upload_orders():
     service = authenticate_gmail()
@@ -158,6 +163,55 @@ def fetch_and_upload_orders():
                     except Exception as e:
                         print(f"  GoodsMart upload failed: {e}")
             continue
+        
+                # --- Halan ---
+        if "طلبيه الخضار شركة خضار دوت كوم -حالا" in subject or "Mohamed.OthmanAli@halan.com" in sender:
+            client = "Halan"
+            order_date = datetime.today().strftime("%Y-%m-%d")
+            status = "Pending"
+
+            # Compute next delivery date (nearest Saturday or Wednesday)
+            today = datetime.today()
+            if today.weekday() <= 2:  # Saturday (5), Sunday (6), Monday (0), Tuesday (1)
+                days_until_wed = (2 - today.weekday()) % 7
+                delivery_date = (today + timedelta(days=days_until_wed)).strftime("%Y-%m-%d")
+            else:  # Wednesday (2), Thursday (3), Friday (4)
+                days_until_sat = (5 - today.weekday()) % 7
+                delivery_date = (today + timedelta(days=days_until_sat)).strftime("%Y-%m-%d")
+
+            # Extract PO Number from body/snippet between 'مدينه نصر' and 'حدايق الاهرام'
+            po_number = None
+            body_text = snippet.replace("\n", " ")
+            match = re.search(r"مدينه نصر(.*?)حدايق الاهرام", body_text)
+            if match:
+                po_number = match.group(1).strip()
+
+            for part in parts:
+                filename = part.get("filename")
+                body = part.get("body", {})
+                if filename and "attachmentId" in body and filename.lower().endswith(".xlsx"):
+                    att_id = body["attachmentId"]
+                    attachment = service.users().messages().attachments().get(
+                        userId='me', messageId=msg['id'], id=att_id).execute()
+                    file_data = base64.urlsafe_b64decode(attachment['data'].encode("UTF-8"))
+                    filename = safe_xlsx_filename(filename)
+                    try:
+                        upload_response = upload_order_and_metadata(
+                            file_bytes=file_data,
+                            filename=filename,
+                            client=client,
+                            order_type="Purchase Order",
+                            order_date=order_date,
+                            delivery_date=delivery_date,
+                            status=status,
+                            city=None,
+                            po_number=po_number
+                        )
+                        print(f"  Uploaded Halan file. Supabase ID: {upload_response[0].get('id')}")
+                    except Exception as e:
+                        print(f"  Halan upload failed: {e}")
+            continue
+        
 
         # --- General (Rabbit / Khateer / Talabat) ---
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
