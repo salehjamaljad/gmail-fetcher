@@ -172,12 +172,15 @@ def fetch_and_upload_orders():
 
             # Compute next delivery date (nearest Saturday or Wednesday)
             today = datetime.today()
-            if today.weekday() <= 2:  # Saturday (5), Sunday (6), Monday (0), Tuesday (1)
-                days_until_wed = (2 - today.weekday()) % 7
+            weekday = today.weekday()  # Monday = 0, Sunday = 6
+
+            if weekday in [5, 6, 0, 1]:  # Saturday, Sunday, Monday, Tuesday
+                days_until_wed = (2 - weekday) % 7 or 7
                 delivery_date = (today + timedelta(days=days_until_wed)).strftime("%Y-%m-%d")
-            else:  # Wednesday (2), Thursday (3), Friday (4)
-                days_until_sat = (5 - today.weekday()) % 7
+            else:  # Wednesday, Thursday, Friday
+                days_until_sat = (5 - weekday) % 7 or 7
                 delivery_date = (today + timedelta(days=days_until_sat)).strftime("%Y-%m-%d")
+
 
             # Extract PO Number from body/snippet between 'مدينه نصر' and 'حدايق الاهرام'
             po_number = None
