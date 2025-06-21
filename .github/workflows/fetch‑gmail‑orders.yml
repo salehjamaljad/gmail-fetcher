@@ -43,5 +43,5 @@ jobs:
             openpyxl
 
       # 5. Run your script (no subfolder assumed)
-      - name: Fetch & upload TMart orders
+      - name: Fetch & upload purchase orders
         run: python gmail_attachment_fetcher.py
