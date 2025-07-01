@@ -2,7 +2,7 @@ name: Fetch Gmail Orders
 
 on:
   schedule:
-    - cron: '44 1-23 * * *'   # Every hour at minute 30 from 6:30 to 17:30 UTC (9:30 to 20:30 Egypt time)
+    - cron: '30 1-23 * * *'   # Every hour at minute 30 from 6:30 to 17:30 UTC (9:30 to 20:30 Egypt time)
   workflow_dispatch:          # Manual trigger
 
 
