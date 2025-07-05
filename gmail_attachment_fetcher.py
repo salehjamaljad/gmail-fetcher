@@ -241,6 +241,7 @@ def fetch_and_upload_orders():
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
             if not match:
+                match = datetime.today()
                 print(f"Skipping email {idx}: no valid date in subject")
                 continue
             order_date = match.strftime("%Y-%m-%d")
