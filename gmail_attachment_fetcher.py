@@ -19,6 +19,7 @@ def search_recent_emails(service):
         'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
         'OR from:Mohamed.OthmanAli@halan.com'
         'OR from:Ahmed.AdelEid@halan.com'
+        'OR from:rabbit.purchasing@rabbitmart.com'
     )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
