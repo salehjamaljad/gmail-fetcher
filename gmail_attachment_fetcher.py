@@ -18,6 +18,7 @@ def search_recent_emails(service):
         'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com '
         'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
         'OR from:Mohamed.OthmanAli@halan.com'
+        'OR from:Ahmed.AdelEid@halan.com'
     )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
@@ -82,14 +83,17 @@ def fetch_and_upload_orders():
 
             date_match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", subject)
             if date_match:
-                delivery_date = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
+                try:
+                    delivery_date = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
+                except ValueError:
+                    delivery_date = datetime.strptime(date_match.group(1), "%m/%d/%Y").strftime("%Y-%m-%d")
             else:
                 delivery_date = get_next_delivery_date()
 
             subject_lower = subject.lower()
             if "alex" in subject_lower:
                 city = "Alexandria"
-            elif "mansoura" in subject_lower:
+            elif "mansoura" or 'mansora' in subject_lower:
                 city = "Mansoura"
             else:
                 city_match = re.search(r"\((.*?)\)", subject)
@@ -165,7 +169,7 @@ def fetch_and_upload_orders():
             continue
         
                 # --- Halan ---
-        if "طلبيه الخضار شركة خضار دوت كوم -حالا" in subject or "Mohamed.OthmanAli@halan.com" in sender:
+        if "طلبيه الخضار شركة خضار دوت كوم -حالا" in subject or "Mohamed.OthmanAli@halan.com" in sender or 'Ahmed.AdelEid@halan.com' in sender:
             client = "Halan"
             order_date = datetime.today().strftime("%Y-%m-%d")
             status = "Pending"
