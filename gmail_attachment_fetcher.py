@@ -7,7 +7,7 @@ from config import authenticate_gmail, upload_order_and_metadata
 import openpyxl
 
 def search_recent_emails(service):
-    after_ts = int((datetime.utcnow() - timedelta(hours=2.1)).timestamp())
+    after_ts = int((datetime.utcnow() - timedelta(hours=4)).timestamp())
     query = (
         f'after:{after_ts} '
         'label:inbox has:attachment '
@@ -18,8 +18,6 @@ def search_recent_emails(service):
         'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com '
         'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
         'OR from:Mohamed.OthmanAli@halan.com'
-        'OR from:Ahmed.AdelEid@halan.com'
-        'OR from:rabbit.purchasing@rabbitmart.com'
     )
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
@@ -84,17 +82,14 @@ def fetch_and_upload_orders():
 
             date_match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", subject)
             if date_match:
-                try:
-                    delivery_date = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
-                except ValueError:
-                    delivery_date = datetime.strptime(date_match.group(1), "%m/%d/%Y").strftime("%Y-%m-%d")
+                delivery_date = datetime.strptime(date_match.group(1), "%d/%m/%Y").strftime("%Y-%m-%d")
             else:
                 delivery_date = get_next_delivery_date()
 
             subject_lower = subject.lower()
             if "alex" in subject_lower:
                 city = "Alexandria"
-            elif "mansoura" or "mansora" in subject_lower:
+            elif "mansoura" in subject_lower:
                 city = "Mansoura"
             else:
                 city_match = re.search(r"\((.*?)\)", subject)
@@ -246,8 +241,8 @@ def fetch_and_upload_orders():
         if subject.lower().startswith("tmart purchase orders") or "sherif.hossam@talabat.com" in sender.lower():
             match = extract_order_date_from_subject(subject)
             if not match:
-                print(f"Skipping email {idx}: no valid date in subject")
-                continue
+                print(f"No valid date in subject for email {idx}, using today's date instead.")
+                match = datetime.today()
             order_date = match.strftime("%Y-%m-%d")
             delivery_date = (match + timedelta(days=2)).strftime("%Y-%m-%d")
             client = "Talabat"
