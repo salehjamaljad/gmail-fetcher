@@ -8,20 +8,32 @@ import openpyxl
 
 def search_recent_emails(service):
     after_ts = int((datetime.utcnow() - timedelta(hours=4)).timestamp())
-    query = (
-        f'after:{after_ts} '
-        'label:inbox has:attachment '
-        '-from:me '
-        '-from:osama@khodar.com '
-        '(subject:"TMart Purchase Orders" OR subject:"Rabbit PO - Khodar trading and marketing" '
-        'OR subject:"Khodar PO - Delivery Date" OR subject:"Khodar.com PO - Goodsmart" '
-        'OR from:sherif.hossam@talabat.com OR from:rabbit.purchasing@rabbitmart.com '
-        'OR from:abdelhamid.oraby@breadfast.com OR from:amir.maher@goodsmartegypt.com)'
-        'OR from:Mohamed.OthmanAli@halan.com'
+
+    parts = [
+        f"after:{after_ts}",
+        "label:inbox has:attachment",
+        "-from:me",
+        "-from:osama@khodar.com",
+        '(' + ' OR '.join([
+            'subject:"TMart Purchase Orders"',
+            'subject:"Rabbit PO - Khodar trading and marketing"',
+            'subject:"Khodar PO - Delivery Date"',
+            'subject:"Khodar.com PO - Goodsmart"',
+            'from:sherif.hossam@talabat.com',
+            'from:rabbit.purchasing@rabbitmart.com',
+            'from:abdelhamid.oraby@breadfast.com',
+            'from:amir.maher@goodsmartegypt.com'
+        ]) + ')',
+        'OR from:Mohamed.OthmanAli@halan.com',
         'OR from:Ahmed.AdelEid@halan.com'
-    )
+    ]
+
+    # join with a single space so there are no accidental run-together tokens
+    query = " ".join(parts)
+    print("Gmail query:", query)   # debug: see what actually gets sent
     results = service.users().messages().list(userId='me', q=query).execute()
     return results.get('messages', [])
+
 
 def extract_order_date_from_subject(subject):
     match = re.search(r"\[(\d{4}-\d{2}-\d{2})\]", subject)
@@ -93,7 +105,7 @@ def fetch_and_upload_orders():
             subject_lower = subject.lower()
             if "alex" in subject_lower:
                 city = "Alexandria"
-            elif "mansoura" or 'mansora' in subject_lower:
+            elif "mansoura" in subject_lower or "mansora" in subject_lower:
                 city = "Mansoura"
             else:
                 city_match = re.search(r"\((.*?)\)", subject)
