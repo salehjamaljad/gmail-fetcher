@@ -1,47 +1,48 @@
 name: Fetch Gmail Orders
 
 on:
-  #schedule:
-    #- cron: '44 * * * *'   # Every hour at minute 44
-  workflow_dispatch:          # Manual trigger
+  workflow_dispatch:   # Manual trigger فقط
 
+permissions:
+  contents: read
 
 env:
   GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
   GMAIL_TOKEN_JSON:        ${{ secrets.GMAIL_TOKEN_JSON }}
+  GOOGLE_APPLICATION_CREDENTIALS: credentials.json
 
 jobs:
   fetch-and-upload:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout your repo
+      # 1️⃣ Checkout الكود
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Write the two JSON files into the repo root
+      # 2️⃣ استرجاع ملفات الـ credentials و token
       - name: Restore Gmail credentials
         run: |
-          printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials.json
-          printf '%s' "$GMAIL_TOKEN_JSON"        > token.json
+          echo "$GOOGLE_CREDENTIALS_JSON" > credentials.json
+          echo "$GMAIL_TOKEN_JSON" > token.json
 
-      # 3. Set up Python
+      # 3️⃣ إعداد Python 3.10
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 4. Install dependencies
+      # 4️⃣ تثبيت الباكيجات المطلوبة
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install \
-            google-auth \
-            google-auth-oauthlib \
-            google-api-python-client \
-            requests \
-            openpyxl
+          pip install google-auth google-auth-oauthlib google-api-python-client requests openpyxl
 
-      # 5. Run your script (no subfolder assumed)
+      # 5️⃣ تنفيذ السكربت
       - name: Fetch & upload purchase orders
         run: python gmail_attachment_fetcher.py
+
+
+      - name: Fetch & upload purchase orders
+        run: python gmail_attachment_fetcher.py
+
