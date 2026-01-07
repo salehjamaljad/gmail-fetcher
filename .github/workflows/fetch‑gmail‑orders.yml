@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ استرجاع ملفات الـ credentials و token
+      # 2️⃣ استرجاع ملفات الـ credentials و token بشكل آمن
       - name: Restore Gmail credentials
         run: |
           echo "$GOOGLE_CREDENTIALS_JSON" > credentials.json
@@ -42,7 +42,4 @@ jobs:
       - name: Fetch & upload purchase orders
         run: python gmail_attachment_fetcher.py
 
-
-      - name: Fetch & upload purchase orders
-        run: python gmail_attachment_fetcher.py
 
