@@ -3,7 +3,7 @@ import base64
 import zipfile
 import io
 from datetime import datetime, timedelta
-from config import authenticate_gmail, upload_order_and_metadata
+from config_fixed import authenticate_gmail, upload_order_and_metadata
 import openpyxl
 
 def search_recent_emails(service):
@@ -288,3 +288,4 @@ def fetch_and_upload_orders():
 
 if __name__ == '__main__':
     fetch_and_upload_orders()
+
